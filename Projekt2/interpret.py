@@ -1,64 +1,74 @@
-from enum import Enum
-import sys
-from pathlib import Path
+import argparse
+import xml.etree.ElementTree as ET
+import frame
+from status import *
+from instruction import *
+import os
 
-class err_code(Enum):
-	ERR_OK = 0
-	ERR_ARGS = 10
-	ERR_FILE_IN = 11
-	ERR_FILE_OUT = 12
-	ERR_INT = 99
-
-def parse_args(args):
-	if (len(sys.argv) == 3):
-		if ("--source=" in sys.argv[1] and "--input=" in sys.argv[2]):
-			args.append(sys.argv[1])
-			args.append(sys.argv[2])
-		elif ("--source=" in sys.argv[2] and "--input=" in sys.argv[1]):
-			args.append(sys.argv[2])
-			args.append(sys.argv[1])
-		else:
-			return 22
-	elif (len(sys.argv) == 2):
-		if ("--source=" in sys.argv[1]):
-			args.append(sys.argv[1])
-			args.append("")
-			args.append("")
-		elif ("--input=" in sys.argv[1]):
-			args.append("")
-			args.append(sys.argv[1])
-			args.append("")
-			args.append("")
-		else:
-			return 22
-	else:
-		return 22
-
-	return 0
+def find_instruction(instructions, order):
+	for instruction in instructions:
+		if instruction.order == order:
+			return instruction
+	return None
 
 def main():
-	args = []
-	ret = parse_args(args)
-	if (ret):
-		print('Invalid arguments')
-		exit(err_code.ERR_ARGS.value)
+	# parse arguments
+	parser = argparse.ArgumentParser(description='Interpreter for IPPcode23.')
+	parser.add_argument('--source', help='IPPcode23 source code file.')
+	parser.add_argument('--input', help='File with inputs for the source file.')
+	args = vars(parser.parse_args())
 
-	if (len(args) == 2):
-		f_xml = args[0].partition('=')[2]
-		f_input = args[1].partition('=')[2]
-	elif (len(args) == 3):
-		f_xml = Path(args[0].partition('=')[2])
-		f_input = sys.stdin
+	if args['input'] is None and args['source'] is None:
+		exit_program(MISSING_PARAM_ERR, "Missing both parameters.")
+	elif args['input'] is None:
+		input_f = sys.stdin
+		source_f = args['source']
+	elif args['source'] is None:
+		input_f = args['input']
+		source_f = sys.stdin
 	else:
-		f_xml = sys.stdin
-		f_input = args[1].partition('=')[2]
+		input_f = args['input']
+		source_f = args['source']
 
-	#if (not f_xml.is_file() or f_xml != sys.stdin) and (f_input != sys.stdin or f_input.is_file()):
-	#	print('File does not exist.')
-	#	exit(err_code.ERR_FILE_IN.value)
-	f_in = open(f_xml, "r")
+	if input_f != sys.stdin and not os.path.isfile(input_f):
+		exit_program(Status.INPUT_FILE_ERR, "Unable to open input file.")
 
-	exit(err_code.ERR_OK.value)
+	if source_f != sys.stdin and not os.path.isfile(source_f):
+		exit_program(Status.INPUT_FILE_ERR, "Unable to open source file.")
+
+	tree = ET.parse(source_f)
+	root = tree.getroot()
+	instructions = []
+	i = 0
+	for child in root:
+		instruction = Instruction(child, input_f)
+		instruction.validate(child)
+		instructions.append(instruction)
+		i = i + 1
+
+	for instruction in instructions:
+		instruction.create_labels()
+		Instruction.labels = instruction.labels
+
+	max_order = 0
+	for instruction in instructions:
+		if instruction.order > max_order:
+			max_order = instruction.order
+
+	order = 1
+	while order <= max_order:
+		instruction = find_instruction(instructions, order)
+		order = instruction.execute()
+		Instruction.GF = instruction.GF
+		Instruction.TF = instruction.TF
+		Instruction.LF = instruction.LF
+		Instruction.stack = instruction.stack
+		Instruction.inputs = instruction.inputs
+		Instruction.labels = instruction.labels
+		if order > max_order:
+			break
+
+	exit_program(Status.OK, None)
 
 if __name__ == "__main__":
 	main()
