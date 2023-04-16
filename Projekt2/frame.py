@@ -30,6 +30,9 @@ class Frame:
 		self.vars[name] = Var(value, var_type)
 
 	def set_value(self, dest, src, src_type):
+		if dest not in self.vars:
+			exit_program(Status.VAR_NOT_EXIST_ERR, f'Variable {dest} not defined.')
+
 		if src_type is None:
 			src_type = self.get_type(src)
 
@@ -39,7 +42,11 @@ class Frame:
 			self.vars[dest] = Var(src, src_type)
 
 	def get_value(self, name):
+		if name not in self.vars:
+			exit_program(Status.VAR_NOT_EXIST_ERR, f'Variable {name} not defined.')
 		return self.vars[name].value
 
 	def get_type(self, name):
+		if name not in self.vars:
+			exit_program(Status.VAR_NOT_EXIST_ERR, f'Variable {name} not defined.')
 		return self.vars[name].var_type
