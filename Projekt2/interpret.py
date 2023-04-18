@@ -11,6 +11,7 @@ from status import *
 from instruction import *
 import os
 
+
 # finds the instruction in the instructions array based on order
 def find_instruction(instructions, order):
     for instruction in instructions:
@@ -18,20 +19,21 @@ def find_instruction(instructions, order):
             return instruction
     return None
 
+
 # checks order duplicity in the XML, it is forbidden
 def check_order_duplicity(root):
     orders = []
 
     for child in root:
-        if child.tag != 'instruction':
+        if child.tag != "instruction":
             exit_program(Status.INVALID_XML_ERR, "Expected instruction element.")
 
-        if 'order' not in child.attrib:
+        if "order" not in child.attrib:
             exit_program(Status.INVALID_XML_ERR, "Missing order attribute.")
-        if 'opcode' not in child.attrib:
+        if "opcode" not in child.attrib:
             exit_program(Status.INVALID_XML_ERR, "Missing opcode attribute.")
 
-        order = child.attrib['order']
+        order = child.attrib["order"]
         if not order.isnumeric():
             exit_program(Status.INVALID_XML_ERR, "Non integer order.")
 
@@ -45,24 +47,25 @@ def check_order_duplicity(root):
 
         orders.append(order)
 
+
 def main():
     # parse arguments
-    parser = argparse.ArgumentParser(description='Interpreter for IPPcode23.')
-    parser.add_argument('--source', help='IPPcode23 source code file.')
-    parser.add_argument('--input', help='File with inputs for the source file.')
+    parser = argparse.ArgumentParser(description="Interpreter for IPPcode23.")
+    parser.add_argument("--source", help="IPPcode23 source code file.")
+    parser.add_argument("--input", help="File with inputs for the source file.")
     args = vars(parser.parse_args())
 
-    if args['input'] is None and args['source'] is None:
+    if args["input"] is None and args["source"] is None:
         exit_program(MISSING_PARAM_ERR, "Missing both parameters.")
-    elif args['input'] is None:
+    elif args["input"] is None:
         input_f = sys.stdin
-        source_f = args['source']
-    elif args['source'] is None:
-        input_f = args['input']
+        source_f = args["source"]
+    elif args["source"] is None:
+        input_f = args["input"]
         source_f = sys.stdin
     else:
-        input_f = args['input']
-        source_f = args['source']
+        input_f = args["input"]
+        source_f = args["source"]
 
     if input_f != sys.stdin and not os.path.isfile(input_f):
         exit_program(Status.INPUT_FILE_ERR, "Unable to open input file.")
@@ -78,7 +81,7 @@ def main():
 
     # get the root element
     root = tree.getroot()
-    if root.tag != 'program':
+    if root.tag != "program":
         exit_program(Status.INVALID_XML_ERR, "Expected program as root element.")
 
     # check the order duplicity
@@ -132,6 +135,7 @@ def main():
             break
 
     exit_program(Status.OK, None)
+
 
 if __name__ == "__main__":
     main()

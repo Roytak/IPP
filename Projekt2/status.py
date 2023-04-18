@@ -7,6 +7,7 @@ Date: 16-04-2023
 import sys
 from enum import Enum
 
+
 # enum for exit codes
 class Status(Enum):
     OK = 0
@@ -23,6 +24,7 @@ class Status(Enum):
     VALUE_ERR = 57
     STRING_ERR = 58
     INTERNAL_ERR = 99
+
 
 # prints the message and terminates the program with the status value
 def exit_program(status, msg):
