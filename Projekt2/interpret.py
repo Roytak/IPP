@@ -1,3 +1,9 @@
+"""
+IPP - Project 2
+Author: Roman Janota
+Date: 16-04-2023
+"""
+
 import argparse
 import xml.etree.ElementTree as ET
 import frame
@@ -5,12 +11,14 @@ from status import *
 from instruction import *
 import os
 
+# finds the instruction in the instructions array based on order
 def find_instruction(instructions, order):
     for instruction in instructions:
         if instruction.order == order:
             return instruction
     return None
 
+# checks order duplicity in the XML, it is forbidden
 def check_order_duplicity(root):
     orders = []
 
@@ -62,29 +70,33 @@ def main():
     if source_f != sys.stdin and not os.path.isfile(source_f):
         exit_program(Status.INPUT_FILE_ERR, "Unable to open source file.")
 
+    # parse the XML
     try:
         tree = ET.parse(source_f)
     except:
         exit_program(Status.MALFORMED_ERR, "Unable to parse XML.")
 
+    # get the root element
     root = tree.getroot()
     if root.tag != 'program':
         exit_program(Status.INVALID_XML_ERR, "Expected program as root element.")
 
+    # check the order duplicity
     check_order_duplicity(root)
 
+    # validate each instruction element and append it to the array
     instructions = []
-    i = 0
     for child in root:
         instruction = Instruction(child, input_f)
         instruction.validate(child)
         instructions.append(instruction)
-        i = i + 1
 
+    # create all the labels
     for instruction in instructions:
         instruction.create_labels()
         Instruction.labels = instruction.labels
 
+    # find the minimum and maximum order of the instructions
     max_order = 0
     min_order = sys.maxsize
     for instruction in instructions:
@@ -95,13 +107,19 @@ def main():
 
     order = min_order
     while order <= max_order:
+        # find the instruction with the given order
         instruction = find_instruction(instructions, order)
         if instruction is None:
+            # order can have holes, meaning there can be order 1 and then order 3
             order = order + 1
             if order > max_order:
                 break
             continue
+
+        # execute the given instruction
         order = instruction.execute()
+
+        # set the new values of static class variables for every instruction
         Instruction.GF = instruction.GF
         Instruction.TF = instruction.TF
         Instruction.LF = instruction.LF
@@ -109,6 +127,7 @@ def main():
         Instruction.inputs = instruction.inputs
         Instruction.labels = instruction.labels
         Instruction.call_stack = instruction.call_stack
+
         if order > max_order:
             break
 

@@ -1,30 +1,42 @@
+"""
+IPP - Project 2
+Author: Roman Janota
+Date: 16-04-2023
+"""
+
 from status import *
 from frame import *
 from collections import deque
 import re
 import ast
 
+"""
+Instruction objects represent XML instruction elements.
+They depend on sharing their static class variables with each other.
+The class contains various methods for validation and execution of the instructions.
+"""
 class Instruction:
-    GF = Frame()
-    TF = None
-    LF = deque()
-    stack = deque()
-    inputs = deque()
-    labels = {}
-    call_stack = deque()
+    GF = Frame()            # Global frame
+    TF = None               # Temporary frame
+    LF = deque()            # Local frame stack
+    stack = deque()         # IPPcode23 instruction's stack
+    inputs = deque()        # Inputs queue
+    labels = {}             # Labels dictionary
+    call_stack = deque()    # Function call stack
 
     def __init__(self, tree, file):
-        self.order = int(tree.attrib['order'])
-        self.opcode = tree.attrib['opcode'].upper()
-        self.op1 = ""
-        self.op1_type = ""
-        self.op2 = ""
-        self.op2_type = ""
-        self.op3 = ""
-        self.op3_type = ""
-        self.in_file = file
-        self.fill_input(file)
+        self.order = int(tree.attrib['order'])      # instruction element's order
+        self.opcode = tree.attrib['opcode'].upper() # instruction element's opcode
+        self.op1 = ""                               # instruction element's arg1 value
+        self.op1_type = ""                          # instruction element's arg1 type
+        self.op2 = ""                               # instruction element's arg2 value
+        self.op2_type = ""                          # instruction element's arg2 type
+        self.op3 = ""                               # instruction element's arg3 value
+        self.op3_type = ""                          # instruction element's arg3 type
+        self.in_file = file                         # file with inputs for IPPcode23 instructions
+        self.fill_input(file)                       # fill the inputs queue if possible
 
+    # fills the labels dictionary
     def create_labels(self):
         if self.opcode == "LABEL":
             for label in self.labels.keys():
@@ -33,6 +45,7 @@ class Instruction:
 
             self.labels[self.op1] = int(self.order) + 1
 
+    # fills the inputs queue if possible
     def fill_input(self, file):
         if file != sys.stdin:
             with open(file) as f:
@@ -41,6 +54,7 @@ class Instruction:
                 self.inputs.append(line.strip())
             f.close()
 
+    # gets the frame of a variable
     def get_frame(self, var):
         if var.find('GF@') != -1:
             return self.GF
@@ -55,6 +69,7 @@ class Instruction:
         else:
             exit_program(Status.INVALID_XML_ERR, "Expected frame name in variable name.")
 
+    # checks if a symbol is a variable
     def is_var(self, name):
         if name is None:
             return False
@@ -64,6 +79,7 @@ class Instruction:
             return True
         return False
 
+    # arithmetic instructions arguments checks
     def check_arithmetic_args(self, arg1_type, arg1_val, arg2_type, arg2_val, instruction):
         if (arg1_type is None and arg1_val is None) or (arg2_type is None and arg2_val is None):
             exit_program(Status.MISSING_VALUE_ERR, f'Var not set in {instruction}.')
@@ -71,6 +87,7 @@ class Instruction:
         if arg1_type != 'int' or arg2_type != 'int':
             exit_program(Status.MISMATCHED_TYPES_ERR, f'Expected two integer operands in {instruction} instruction.')
 
+    # logical instructions arguments checks
     def check_logical_args(self, arg1_type, arg1_val, arg2_type, arg2_val, instruction):
         if (arg1_type is None and arg1_val is None) or (instruction != 'NOT' and arg2_type is None and arg2_val is None):
             exit_program(Status.MISSING_VALUE_ERR, f'Var not set in {instruction}.')
@@ -78,6 +95,7 @@ class Instruction:
         if arg1_type != 'bool' or (instruction != 'NOT' and arg2_type is not None and arg2_type != 'bool'):
             exit_program(Status.MISMATCHED_TYPES_ERR, f'Expected two boolean operands in {instruction} instruction.')
 
+    # relation instructions arguments checks
     def check_relation_args(self, arg1_type, arg1_val, arg2_type, arg2_val, instruction):
         if (arg1_type is None and arg1_val is None) or (arg2_type is None and arg2_val is None):
             exit_program(Status.MISSING_VALUE_ERR, f'Var not set in {instruction}.')
@@ -89,6 +107,7 @@ class Instruction:
             if arg1_type == "nil" or arg2_type == "nil":
                 exit_program(Status.MISMATCHED_TYPES_ERR, "Nil as operand in LT.")
 
+    # flow control instructions arguments checks
     def check_jump_args(self, arg1_type, arg1_val, arg2_type, arg2_val, instruction):
         if (arg1_type is None and arg1_val is None) or (arg2_type is None and arg2_val is None):
             exit_program(Status.MISSING_VALUE_ERR, f'Var not set in {instruction}.')
@@ -99,6 +118,7 @@ class Instruction:
         if self.op1 not in self.labels:
             exit_program(Status.SEMTANTIC_ERR, f'Label {self.op1} not defined.')
 
+    # gets symbols types and values
     def get_frame_value_types(self, sym1, sym1_type, sym2, sym2_type):
         if self.is_var(sym1):
             frame1 = self.get_frame(sym1)
@@ -118,6 +138,7 @@ class Instruction:
 
         return value1, type1, value2, type2
 
+# The actual interpretation of IPPcode23 instruction set follows
     def do_move(self):
         value1, type1, value2, type2 = self.get_frame_value_types(self.op2, self.op2_type, None, None)
 
@@ -338,8 +359,11 @@ class Instruction:
     def do_int2char(self):
         value1, type1, value2, type2 = self.get_frame_value_types(self.op2, self.op2_type, None, None)
 
+        if value1 is None and type1 is None:
+            exit_program(Status.MISSING_VALUE_ERR, f'Variable {self.op2} not set in INT2CHAR.')
+
         if type1 != "int":
-            exit_program(Status.STRING_ERR, "Expected valid type in INT2CHAR")
+            exit_program(Status.MISMATCHED_TYPES_ERR, "Expected valid type in INT2CHAR")
 
         try:
             ret = chr(int(value1))
@@ -352,8 +376,11 @@ class Instruction:
     def do_stri2int(self):
         value1, type1, value2, type2 = self.get_frame_value_types(self.op2, self.op2_type, self.op3, self.op3_type)
 
+        if (value1 is None and type1 is None) or (value2 is None and type2 is None):
+            exit_program(Status.MISSING_VALUE_ERR, f'Variable {self.op2} not set in STRI2INT.')
+
         if type1 != "string" or type2 != "int":
-            exit_program(Status.STRING_ERR, "Expected valid type in STRI2INT")
+            exit_program(Status.MISMATCHED_TYPES_ERR, "Expected valid type in STRI2INT")
 
         if int(value2) < 0 or int(value2) > len(value1):
             exit_program(Status.STRING_ERR, "Invalid length in STRI2INT")
@@ -368,6 +395,7 @@ class Instruction:
 
     def do_read(self):
         if self.in_file != sys.stdin:
+            # read from queue if command line arg was specified
             if len(self.inputs) == 0:
                 read = "nil"
             else:
@@ -376,7 +404,10 @@ class Instruction:
             read = input()
 
         if self.op2 == "int":
-            value = int(read)
+            try:
+                value = int(read)
+            except:
+                read = "nil"
             type1 = "int"
         elif self.op2 == "bool":
             if read.lower() == "true":
@@ -403,19 +434,29 @@ class Instruction:
 
         if str(type1).find('nil') != -1:
             value1 = ""
+
         print(value1, end = '')
 
     def do_concat(self):
         value1, type1, value2, type2 = self.get_frame_value_types(self.op2, self.op2_type, self.op3, self.op3_type)
 
         if (type1 is None and value1 is None) or (type2 is None and value2 is None):
-            exit_program(Status.MISSING_VALUE_ERR, 'Var not set in GETCHAR.')
+            exit_program(Status.MISSING_VALUE_ERR, 'Var not set in CONCAT.')
 
         if type1 != "string" or type2 != "string":
             exit_program(Status.MISMATCHED_TYPES_ERR, "Only string types allowed in CONCAT.")
 
+        if value1 is None and value2 is None:
+            ret = ""
+        elif value2 is None:
+            ret = value1
+        elif value1 is None:
+            ret = value2
+        else:
+            ret = value1 + value2
+
         frame = self.get_frame(self.op1)
-        frame.set_value(self.op1, value1 + value2, "string")
+        frame.set_value(self.op1, ret, "string")
 
     def do_strlen(self):
         value1, type1, value2, type2 = self.get_frame_value_types(self.op2, self.op2_type, None, None)
@@ -543,6 +584,7 @@ class Instruction:
 
         print(value1, file=sys.stderr)
 
+# calls the corresponding function based on the opcode and returns the next order
     def execute(self):
         order = 0
 
@@ -620,6 +662,7 @@ class Instruction:
         else:
             return order
 
+# validates the instruction, it's argument count and types if possible
     def validate(self, tree):
         if self.opcode == "MOVE":
             for element in tree:
