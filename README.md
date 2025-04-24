@@ -1,3 +1,3 @@
 # IPP
 
-IPPcode23 parser and interpreter
+The Principles of Programming Languages school course projects in PHP and Python.
